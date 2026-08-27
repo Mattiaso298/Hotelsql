@@ -62,10 +62,7 @@ CREATE TABLE PersonaleHotel (
 	nome			varchar(20)	not null,
     cognome			varchar(20)	not null,
     
-
-    
     primary key(cf)
-    
 );
 
 
@@ -140,15 +137,23 @@ VALUES
 (103, 3, 150.00, 'singola');
 
 -- Inserimento di prenotazioni
-INSERT INTO Prenotazione (cliente_cf, cameranumeroStanza, codice, dataArrivo, dataPartenza)
+INSERT INTO Prenotazione ( cameranumeroStanza, codice, dataArrivo, dataPartenza)
 VALUES 
 
-('CF123456', 101, 'PREN001', '2024-03-01', '2024-03-05'),
-('CF987654', 101, 'PREN002', '2024-03-01', '2024-03-05'),
+(101, 'PREN001', '2024-03-01', '2024-03-05'),
+(101, 'PREN002', '2024-03-01', '2024-03-05'),
 
 
-('CF789012', 102, 'PREN003', '2024-03-10', '2024-03-15'),
-('CF345678', 103, 'PREN004', '2024-03-20', '2024-03-25');
+(102, 'PREN003', '2024-03-10', '2024-03-15'),
+(103, 'PREN004', '2024-03-20', '2024-03-25');
+
+-- Tabella ponte: collega i clienti alle rispettive prenotazioni
+INSERT INTO Cliente_Prenotazione (cliente_cf, prenotazione_codice) VALUES
+('CF123456', 'PREN001'),
+('CF987654', 'PREN002'),
+('CF789012', 'PREN003'),
+('CF345678', 'PREN004');
+
 
 -- Inserimento del personale dell'hotel
 INSERT INTO PersonaleHotel (cf, nome, cognome)
@@ -217,7 +222,8 @@ order by nome Asc
 
 
 # (3) Seleziona i clienti che hanno prenotato camere con 2 posti letto (cf)
-Select cliente_cf from Prenotazione
+Select cliente_cf from Cliente_Prenotazione
+join Prenotazione ON Cliente_Prenotazione.prenotazione_codice = Prenotazione.codice
 join Camera on Prenotazione.cameranumeroStanza = Camera.numeroStanza
 where Camera.postiLetto = 2
 ;
@@ -255,7 +261,6 @@ where Competenze.descrizione = 'Idraulico'
 group by PersonaleHotel.cf
 ;
 
-
 # (8) seleziona il personale hotel manutenzione che e' idraulico ma non elettricista ( cf )
 SELECT Competenze.cf
 FROM Competenze
@@ -267,7 +272,6 @@ SELECT Competenze.cf
 FROM Competenze
 WHERE Competenze.descrizione = 'Elettricista'
 ;
-
 
 # (9) seleziona il personale di manutenzione dell'hotel che lavora nella camera piu' costosa ( cf, nome, cognome, contaPrezzo, ora )
 
