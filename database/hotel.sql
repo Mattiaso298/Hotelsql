@@ -23,31 +23,33 @@ CREATE TABLE Cliente(
 #ALTER TABLE Cliente
 #ADD COLUMN eta INT AS (YEAR(NOW()) - YEAR(dataNascita) - (RIGHT(NOW(), 5) < RIGHT(dataNascita, 5))) STORED;
 
-CREATE TABLE Camera(
-    numeroStanza	int			not null,
-    postiLetto		int			not null,
-    prezzo			double		not null,
-	tipoCamera		varchar(20) not null,
 
-    primary key(numeroStanza)
-
-);
 
 CREATE TABLE Prenotazione(
-                             cameranumeroStanza int     not null,
 
                              codice       varchar(20) not null,
                              dataArrivo     date      not null,
                              dataPartenza    date      not null,
 
-                             primary key(codice),
+                             primary key(codice)
 
-                             foreign key (cameranumeroStanza) REFERENCES Camera(numeroStanza)
+#                             foreign key (cameranumeroStanza) REFERENCES Camera(numeroStanza)
+
+);
+CREATE TABLE Camera(
+                       numeroStanza	int			not null,
+                       postiLetto		int			not null,
+                       prezzo			double		not null,
+                       tipoCamera		varchar(20) not null,
+
+                       codicePrenotazione       varchar(20) ,
+                       primary key(numeroStanza),
+                       foreign key (codicePrenotazione) REFERENCES Prenotazione(codice)
 );
 
 -- New Junction Table to handle the Many-to-Many relationship
 CREATE TABLE Cliente_Prenotazione(
-                                     cliente_cf             varchar(20) not null,
+                                     cliente_cf             varchar(20) ,
                                      prenotazione_codice    varchar(20) not null,
 
                                      primary key(cliente_cf, prenotazione_codice),
@@ -93,7 +95,6 @@ CREATE TABLE PersonalePulizie (
  
  );
  
-
 CREATE TABLE Segnalazione (
     codice 			varchar(20)	not null,
 	segnalazione	varchar(100) not null,
@@ -106,7 +107,6 @@ CREATE TABLE Segnalazione (
     foreign key (cameranumeroStanza) REFERENCES Camera(numeroStanza)
     
 );
-
 
 CREATE TABLE Lavora (
 	hotelcf				varchar(20)	not null,
@@ -129,23 +129,24 @@ VALUES
 ('CF987654', 'Francesca', 'Esposito', 'francesca.esposito@email.com', 'Via Palermo', '321', 'Napoli','1992-07-23');
 ;
 
--- Inserimento delle camere
-INSERT INTO Camera (numeroStanza, postiLetto, prezzo,tipoCamera )
-VALUES 
-(101, 2, 100.00, 'singola'),
-(102, 1, 80.00, 'doppia'),
-(103, 3, 150.00, 'singola');
-
 -- Inserimento di prenotazioni
-INSERT INTO Prenotazione ( cameranumeroStanza, codice, dataArrivo, dataPartenza)
+INSERT INTO Prenotazione (  codice, dataArrivo, dataPartenza)
+VALUES
+
+    ( 'PREN001', '2024-03-01', '2024-03-05'),
+    ( 'PREN002', '2024-03-01', '2024-03-05'),
+
+
+    ( 'PREN003', '2024-03-10', '2024-03-15'),
+    ( 'PREN004', '2024-03-20', '2024-03-25');
+
+
+-- Inserimento delle camere
+INSERT INTO Camera (numeroStanza, postiLetto, prezzo,tipoCamera,codicePrenotazione)
 VALUES 
-
-(101, 'PREN001', '2024-03-01', '2024-03-05'),
-(101, 'PREN002', '2024-03-01', '2024-03-05'),
-
-
-(102, 'PREN003', '2024-03-10', '2024-03-15'),
-(103, 'PREN004', '2024-03-20', '2024-03-25');
+(101, 2, 100.00, 'singola','PREN001'),
+(102, 1, 80.00, 'doppia','PREN001'),
+(103, 3, 150.00, 'singola','PREN002');
 
 -- Tabella ponte: collega i clienti alle rispettive prenotazioni
 INSERT INTO Cliente_Prenotazione (cliente_cf, prenotazione_codice) VALUES
@@ -214,6 +215,11 @@ select nome, cognome, citta, eta from cliente
 where citta = 'Roma' or citta = 'Milano'
 ;
 
+SELECT Prenotazione.codice, Camera.numeroStanza
+FROM Prenotazione
+JOIN Camera ON Prenotazione.codice = Camera.codicePrenotazione;
+
+
 
 # (2) Seleziona tutti i clienti in ordine alfabetico per nome (nome, cf)
 Select nome, cf from cliente
@@ -221,36 +227,34 @@ order by nome Asc
 ;
 
 
-# (3) Seleziona i clienti che hanno prenotato camere con 2 posti letto (cf)
-Select cliente_cf from Cliente_Prenotazione
-join Prenotazione ON Cliente_Prenotazione.prenotazione_codice = Prenotazione.codice
-join Camera on Prenotazione.cameranumeroStanza = Camera.numeroStanza
-where Camera.postiLetto = 2
-;
+# (3) Seleziona i clienti che hanno prenotato camere con 2 posti letto
+SELECT cliente_cf FROM Cliente_Prenotazione
+JOIN Prenotazione ON Cliente_Prenotazione.prenotazione_codice = Prenotazione.codice
+JOIN Camera ON Prenotazione.codice = Camera.codicePrenotazione
+WHERE Camera.postiLetto = 2;
 
-# (4) seleziona le stanze che sono state prenotate da piu' di un cliente (numeroStanza, numeroStanze)
-create view contaPrenotazioni as
-Select cameranumeroStanza, count(cameranumeroStanza) as numeroStanze from Prenotazione
-group by cameranumeroStanza
-;
+# (4) Crea vista e seleziona le stanze prenotate da più di un cliente
+CREATE VIEW contaClientiPerStanza AS
+SELECT Camera.numeroStanza, COUNT(Cliente_Prenotazione.cliente_cf) AS numeroClienti
+FROM Camera
+JOIN Prenotazione ON Camera.codicePrenotazione = Prenotazione.codice
+JOIN Cliente_Prenotazione ON Prenotazione.codice = Cliente_Prenotazione.prenotazione_codice
+GROUP BY Camera.numeroStanza;
 
-select * from contaPrenotazioni
-where contaPrenotazioni.numeroStanze > 1
-;
+# select * from contaPrenotazioni
+# where contaPrenotazioni.numeroStanze > 1
+# ;
 
-# (5) Seleziona la camera che e' stata prenotata da piu' clienti
 
-select * from contaPrenotazioni
-where contaPrenotazioni.numeroStanze = (Select max(numeroStanze) from contaPrenotazioni)
-;
+# (5) Seleziona la camera che è stata prenotata da più clienti
+SELECT * FROM contaClientiPerStanza
+WHERE numeroClienti = (SELECT MAX(numeroClienti) FROM contaClientiPerStanza);
 
-#(6) seleziona il codice di segnalazione e il cf del personale e la descrizione della segnalazione della camera che e' stata prenotata da piu' clienti
 
-select codice, cf,  segnalazione from Segnalazione
-join contaPrenotazioni on Segnalazione.cameranumeroStanza = contaPrenotazioni.cameranumeroStanza
-
-where contaPrenotazioni.numeroStanze = (Select max(numeroStanze) from contaPrenotazioni)
-;
+# (6) Segnalazioni per la camera prenotata da più clienti
+SELECT codice, cf, segnalazione FROM Segnalazione
+JOIN contaClientiPerStanza ON Segnalazione.cameranumeroStanza = contaClientiPerStanza.numeroStanza
+WHERE contaClientiPerStanza.numeroClienti = (SELECT MAX(numeroClienti) FROM contaClientiPerStanza);
 
 
 #(7) seleziona i personali hotel che hanno idraulico come competenza (descrizione, cf, nome, cognome)
@@ -303,4 +307,10 @@ where not exists (
             ))
 ;
 
+# MOSTRA TUTTI I CLIENTI
+SELECT * FROM Cliente;
 
+# MOSTRA TUTTE LE CAMEE
+SELECT * FROM Camera;
+
+# MOSTRA TUTTE LE PRENOTAZIONI
